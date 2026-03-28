@@ -54,13 +54,17 @@ function formatKesAmount(amount: number): string {
 function extractCurrentKesAmount(raw: string): number | null {
   const trimmed = raw.replace(/\s+/g, " ").trim();
 
+  // Look for explicit "current price" mention first
   const current = trimmed.match(/current price(?:\s+is)?\s*[:]?\s*(ksh|kes)?\s*([\d,]+(?:\.\d+)?)/i);
   if (current?.[2]) {
     const normalized = Number.parseFloat(current[2].replace(/,/g, ""));
     if (Number.isFinite(normalized)) return Math.round(normalized);
   }
 
-  const allKesValues = [...trimmed.matchAll(/(?:ksh|kes)\s*([\d,]+(?:\.\d+)?)/gi)];
+  // Find all KES/KSH amounts (handles Ksh., Ksh, KES, etc.)
+  const allKesValues = [...trimmed.matchAll(/(?:ksh|kes)\.?\s*([\d,]+(?:\.\d+)?)/gi)];
+  
+  // If we have multiple values, the last one is typically the current/sale price
   const finalKes = allKesValues.at(-1)?.[1];
   if (!finalKes) return null;
 
@@ -77,11 +81,11 @@ function formatExternalPrice(description: string, fallbackPriceCents: number, cu
 function cleanExternalDescription(raw: string): string {
   const trimmed = raw.replace(/\s+/g, " ").trim();
   const cleaned = trimmed
-    .replace(/original price was\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
-    .replace(/current price(?:\s+is)?\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
-    .replace(/(?:ksh|kes)\s*[\d,]+(?:\.\d+)?/gi, "")
+    .replace(/original price was\s*[:]?(?:\s*(ksh|kes)?\.?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
+    .replace(/current price(?:\s+is)?\s*[:]?(?:\s*(ksh|kes)?\.?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
+    .replace(/[\-\s]*(?:ksh|kes)\.?\s*[\d,]+(?:\.\d+)?/gi, "")
     .replace(/\s+/g, " ")
-    .replace(/^[\s:;,.\-]+|[\s:;,.\-]+$/g, "")
+    .replace(/^[\s:;,\.\-]+|[\s:;,\.\-]+$/g, "")
     .trim();
 
   return cleaned || "Marketplace offer";
@@ -89,11 +93,11 @@ function cleanExternalDescription(raw: string): string {
 
 function cleanExternalTitle(raw: string): string {
   return raw
-    .replace(/original price was\s*[:]?(?:\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
-    .replace(/current price(?:\s+is)?\s*[:]?(?:\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
-    .replace(/(?:ksh|kes)\s*[\d,]+(?:\.\d+)?/gi, "")
+    .replace(/original price was\s*[:]?(?:\s*(ksh|kes)?\.?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
+    .replace(/current price(?:\s+is)?\s*[:]?(?:\s*(ksh|kes)?\.?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
+    .replace(/[\-\s]*(?:ksh|kes)\.?\s*[\d,]+(?:\.\d+)?/gi, "")
     .replace(/\s+/g, " ")
-    .replace(/^[\s:;,.\-]+|[\s:;,.\-]+$/g, "")
+    .replace(/^[\s:;,\.\-]+|[\s:;,\.\-]+$/g, "")
     .trim();
 }
 
