@@ -75,11 +75,16 @@ function cleanExternalDescription(raw: string): string {
 
 function cleanExternalTitle(raw: string): string {
   return raw
-    .replace(/original price was\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
-    .replace(/current price(?:\s+is)?\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
+    .replace(/original price was\s*[:]?(?:\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
+    .replace(/current price(?:\s+is)?\s*[:]?(?:\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
     .replace(/(?:ksh|kes)\s*[\d,]+(?:\.\d+)?/gi, "")
     .replace(/\s+/g, " ")
+    .replace(/^[\s:;,.\-]+|[\s:;,.\-]+$/g, "")
     .trim();
+}
+
+function hasDescription(value: string): boolean {
+  return value.replace(/\s+/g, " ").trim().length >= 10;
 }
 
 export default function MarketplacePage() {
@@ -145,6 +150,7 @@ export default function MarketplacePage() {
 
   const visibleLocal = useMemo(() => {
     return listings.filter((l) => {
+      if (!hasDescription(l.description)) return false;
       const categoryOk = category === "all" ? true : l.category === category;
       if (!categoryOk) return false;
       if (!normalizedQuery) return true;
@@ -155,6 +161,7 @@ export default function MarketplacePage() {
 
   const visibleExternal = useMemo(() => {
     return externalListings.filter((l) => {
+      if (!hasDescription(l.description)) return false;
       const categoryOk = category === "all" ? true : l.category === category;
       if (!categoryOk) return false;
       if (!normalizedQuery) return true;

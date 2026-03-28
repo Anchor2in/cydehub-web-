@@ -76,6 +76,36 @@ const FALLBACK_ITEMS: Omit<AggregatedMarketplaceItem, "id" | "created_at">[] = [
     image_url: null,
   },
   {
+    title: "PlayStation Plus Essential - 1 Month",
+    description: "PSN subscription code for PlayStation Plus Essential monthly access.",
+    category: "gift_card",
+    price_cents: 1099,
+    currency: "USD",
+    source: "Z2U",
+    source_url: "https://www.z2u.com/",
+    image_url: null,
+  },
+  {
+    title: "PlayStation Plus Extra - 3 Months",
+    description: "PSN subscription code for PlayStation Plus Extra with game catalog access.",
+    category: "gift_card",
+    price_cents: 2599,
+    currency: "USD",
+    source: "Z2U",
+    source_url: "https://www.z2u.com/",
+    image_url: null,
+  },
+  {
+    title: "PlayStation Plus Deluxe - 12 Months",
+    description: "PSN yearly subscription code for PlayStation Plus Deluxe membership.",
+    category: "gift_card",
+    price_cents: 6999,
+    currency: "USD",
+    source: "Z2U",
+    source_url: "https://www.z2u.com/",
+    image_url: null,
+  },
+  {
     title: "Gaming Access Coupon Bundle",
     description: "Promo coupon bundle for digital game-related purchases and subscriptions.",
     category: "coupon",
@@ -197,6 +227,22 @@ function hasMeaningfulTitle(title: string): boolean {
   return meaningfulTokens.length > 0;
 }
 
+function cleanExternalTitle(raw: string): string {
+  return raw
+    .replace(/original price was\s*[:]?(?:\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
+    .replace(/current price(?:\s+is)?\s*[:]?(?:\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?)?\.?/gi, "")
+    .replace(/(?:ksh|kes)\s*[\d,]+(?:\.\d+)?/gi, "")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s:;,.\-]+|[\s:;,.\-]+$/g, "")
+    .trim();
+}
+
+function hasMeaningfulDescription(description: string): boolean {
+  const text = description.replace(/\s+/g, " ").trim();
+  if (text.length < 10) return false;
+  return /[a-z]{3,}/i.test(text);
+}
+
 function guessCategory(text: string): AggregatedMarketplaceCategory {
   const value = text.toLowerCase();
   if (value.includes("gift") && value.includes("card")) return "gift_card";
@@ -258,10 +304,11 @@ function parseProductJsonLd(html: string, baseUrl: string, source: string): Aggr
         const types = Array.isArray(n["@type"]) ? n["@type"] : [n["@type"]];
         if (!types.some((t) => typeof t === "string" && t.toLowerCase() === "product")) continue;
 
-        const title = stripHtml(n.name ?? "");
+        const title = cleanExternalTitle(stripHtml(n.name ?? ""));
         if (!title || !hasMeaningfulTitle(title)) continue;
 
         const description = stripHtml(n.description ?? "").slice(0, 280) || `${title} from ${source}.`;
+        if (!hasMeaningfulDescription(description)) continue;
         const sourceUrl = normalizeUrl(n.url ?? baseUrl, baseUrl);
         const image = Array.isArray(n.image) ? n.image[0] : n.image;
         const imageUrl = image ? normalizeUrl(image, baseUrl) : null;
@@ -310,9 +357,12 @@ function parseHtmlCards(html: string, baseUrl: string, source: string): Aggregat
     const priceMatch = cardText.match(/(?:USD|KES|KSH|\$|€|£)\s?\d[\d,.]*(?:\.\d{1,2})?|\d[\d,.]*(?:\.\d{1,2})?\s?(?:USD|KES|KSH|€|£)/i);
     if (!priceMatch?.[0]) continue;
 
-    const title = cardText.split(" ").slice(0, 10).join(" ").trim();
+    const title = cleanExternalTitle(cardText.split(" ").slice(0, 10).join(" ").trim());
     const cents = parsePriceCents(priceMatch[0]);
     if (!title || !cents || !hasMeaningfulTitle(title)) continue;
+
+    const description = cardText.slice(0, 240);
+    if (!hasMeaningfulDescription(description)) continue;
 
     const imgMatch = card.body.match(/<img[^>]+src=["']([^"']+)["']/i);
     const sourceUrl = normalizeUrl(card.href, baseUrl);
@@ -320,7 +370,7 @@ function parseHtmlCards(html: string, baseUrl: string, source: string): Aggregat
     out.push({
       id: `ext_m_${stableId(sourceUrl)}`,
       title,
-      description: cardText.slice(0, 240),
+      description,
       category: guessCategory(cardText),
       price_cents: cents,
       currency: guessCurrency(priceMatch[0]),
@@ -404,7 +454,13 @@ export async function getAggregatedMarketplaceItems(limit = 120): Promise<Aggreg
 
   const withFallbacks = ensureRequiredCategories([...merged.values()]);
   const items = withFallbacks
-    .filter((item) => item.title.length >= 4 && item.price_cents > 0 && hasMeaningfulTitle(item.title))
+    .filter(
+      (item) =>
+        item.title.length >= 4 &&
+        item.price_cents > 0 &&
+        hasMeaningfulTitle(item.title) &&
+        hasMeaningfulDescription(item.description),
+    )
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   cache = { at: Date.now(), items };
