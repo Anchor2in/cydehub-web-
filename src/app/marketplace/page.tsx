@@ -30,6 +30,58 @@ function categoryLabel(value: string): string {
   return value.replaceAll("_", " ");
 }
 
+const FX_TO_KES: Record<string, number> = {
+  KES: 1,
+  USD: 135,
+  EUR: 148,
+  GBP: 172,
+};
+
+function toKesCents(priceCents: number, currency: string): number {
+  const rate = FX_TO_KES[currency.toUpperCase()] ?? 1;
+  return Math.round(priceCents * rate);
+}
+
+function formatKes(priceCents: number, currency: string): string {
+  const kes = Math.round(toKesCents(priceCents, currency) / 100);
+  return `KSh ${new Intl.NumberFormat("en-KE").format(kes)}`;
+}
+
+function cleanExternalDescription(raw: string): string {
+  const trimmed = raw.replace(/\s+/g, " ").trim();
+  const current = trimmed.match(/current price(?:\s+is)?\s*[:]?\s*(ksh|kes)?\s*([\d,]+(?:\.\d+)?)/i);
+  if (current?.[2]) {
+    const normalized = Number.parseFloat(current[2].replace(/,/g, ""));
+    if (Number.isFinite(normalized)) {
+      return `Current price: KSh ${new Intl.NumberFormat("en-KE").format(Math.round(normalized))}`;
+    }
+  }
+
+  const allKesValues = [...trimmed.matchAll(/(?:ksh|kes)\s*([\d,]+(?:\.\d+)?)/gi)];
+  const finalKes = allKesValues.at(-1)?.[1];
+  if (finalKes) {
+    const normalized = Number.parseFloat(finalKes.replace(/,/g, ""));
+    if (Number.isFinite(normalized)) {
+      return `Current price: KSh ${new Intl.NumberFormat("en-KE").format(Math.round(normalized))}`;
+    }
+  }
+
+  return trimmed
+    .replace(/original price was\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
+    .replace(/current price is\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function cleanExternalTitle(raw: string): string {
+  return raw
+    .replace(/original price was\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
+    .replace(/current price(?:\s+is)?\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
+    .replace(/(?:ksh|kes)\s*[\d,]+(?:\.\d+)?/gi, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function MarketplacePage() {
   const enabled = useMemo(() => hasSupabaseEnv(), []);
   const [loading, setLoading] = useState(true);
@@ -206,12 +258,12 @@ export default function MarketplacePage() {
           <label className="block">
             <div className="text-xs font-medium text-white/60">Category</div>
             <select
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[color:var(--cyber)]/30"
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/70 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[color:var(--cyber)]/30"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
             >
               {categories.map((c) => (
-                <option key={c} value={c}>
+                <option key={c} value={c} className="bg-black text-white">
                   {c === "all" ? "All" : categoryLabel(c)}
                 </option>
               ))}
@@ -221,13 +273,13 @@ export default function MarketplacePage() {
           <label className="block">
             <div className="text-xs font-medium text-white/60">Sort by</div>
             <select
-              className="mt-2 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[color:var(--cyber)]/30"
+              className="mt-2 w-full rounded-2xl border border-white/10 bg-black/70 px-4 py-3 text-sm text-white outline-none focus:ring-2 focus:ring-[color:var(--cyber)]/30"
               value={sort}
               onChange={(e) => setSort(e.target.value as typeof sort)}
             >
-              <option value="newest">Newest</option>
-              <option value="price_asc">Price: Low to high</option>
-              <option value="price_desc">Price: High to low</option>
+              <option value="newest" className="bg-black text-white">Newest</option>
+              <option value="price_asc" className="bg-black text-white">Price: Low to high</option>
+              <option value="price_desc" className="bg-black text-white">Price: High to low</option>
             </select>
           </label>
         </div>
@@ -267,7 +319,7 @@ export default function MarketplacePage() {
                           {categoryLabel(item.category)}
                         </div>
                         <div className="pill-3d shrink-0 rounded-full px-3 py-1 text-xs font-medium text-white">
-                          {(item.price_cents / 100).toFixed(2)} {item.currency}
+                          {formatKes(item.price_cents, item.currency)}
                         </div>
                       </div>
 
@@ -281,14 +333,10 @@ export default function MarketplacePage() {
                       ) : null}
 
                       <div className="mt-4 text-lg font-semibold leading-snug tracking-tight text-white">
-                        {item.title}
+                        {item.external ? cleanExternalTitle(item.title) || item.title : item.title}
                       </div>
-                      <div className="mt-3 line-clamp-3 text-sm leading-relaxed text-white/70">
-                        {item.description}
-                      </div>
-
-                      <div className="mt-4 inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/70">
-                        {item.source}
+                      <div className="mt-3 line-clamp-3 text-justify text-sm leading-relaxed text-white/70">
+                        {item.external ? cleanExternalDescription(item.description) : item.description}
                       </div>
 
                       <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-[color:var(--cyber)]">
@@ -308,7 +356,7 @@ export default function MarketplacePage() {
                           {categoryLabel(item.category)}
                         </div>
                         <div className="pill-3d shrink-0 rounded-full px-3 py-1 text-xs font-medium text-white">
-                          {(item.price_cents / 100).toFixed(2)} {item.currency}
+                          {formatKes(item.price_cents, item.currency)}
                         </div>
                       </div>
 
@@ -317,10 +365,6 @@ export default function MarketplacePage() {
                       </div>
                       <div className="mt-3 line-clamp-3 text-sm leading-relaxed text-white/70">
                         {item.description}
-                      </div>
-
-                      <div className="mt-4 inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/70">
-                        {item.source}
                       </div>
 
                       <div className="mt-5 inline-flex items-center gap-2 text-sm font-medium text-[color:var(--cyber)]">
@@ -372,19 +416,16 @@ export default function MarketplacePage() {
 
                 <div className="mt-4 flex items-start justify-between gap-4">
                   <div>
-                    <div className="inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/70">
-                      {item.source}
-                    </div>
                     <div className="mt-2 text-base font-semibold tracking-tight text-white">
-                      {item.title}
+                      {cleanExternalTitle(item.title) || item.title}
                     </div>
                   </div>
                   <div className="pill-3d shrink-0 rounded-full px-3 py-1 text-sm font-medium text-white">
-                    {(item.price_cents / 100).toFixed(2)} {item.currency}
+                    {formatKes(item.price_cents, item.currency)}
                   </div>
                 </div>
 
-                <div className="mt-2 line-clamp-2 text-sm text-white/70">{item.description}</div>
+                <div className="mt-2 line-clamp-2 text-justify text-sm text-white/70">{cleanExternalDescription(item.description)}</div>
                 <div className="mt-3 text-sm font-medium text-[color:var(--cyber)] underline-offset-4 group-hover:underline">
                   Buy now
                 </div>
@@ -453,17 +494,14 @@ export default function MarketplacePage() {
                   </div>
                 </div>
                 <div className="mt-2 text-lg font-semibold tracking-tight text-white">
-                  {item.title}
-                </div>
-                <div className="mt-2 inline-flex rounded-full border border-white/10 bg-white/5 px-2 py-1 text-xs text-white/70">
-                  {item.source}
+                  {cleanExternalTitle(item.title) || item.title}
                 </div>
               </div>
               <div className="pill-3d shrink-0 rounded-full px-3 py-1 text-sm font-medium text-white">
-                {(item.price_cents / 100).toFixed(2)} {item.currency}
+                {formatKes(item.price_cents, item.currency)}
               </div>
             </div>
-            <div className="mt-3 line-clamp-2 text-sm text-white/70">{item.description}</div>
+            <div className="mt-3 line-clamp-2 text-justify text-sm text-white/70">{cleanExternalDescription(item.description)}</div>
             <div className="mt-4 text-sm font-medium text-[color:var(--cyber)] underline-offset-4 group-hover:underline">
               Open source listing
             </div>
@@ -488,10 +526,10 @@ export default function MarketplacePage() {
                 </div>
               </div>
               <div className="pill-3d shrink-0 rounded-full px-3 py-1 text-sm font-medium text-white">
-                {(l.price_cents / 100).toFixed(2)} {l.currency}
+                {formatKes(l.price_cents, l.currency)}
               </div>
             </div>
-            <div className="mt-3 line-clamp-2 text-sm text-white/70">
+            <div className="mt-3 line-clamp-2 text-justify text-sm text-white/70">
               {l.description}
             </div>
             <div className="mt-4 text-sm font-medium text-[color:var(--cyber)] underline-offset-4 group-hover:underline">

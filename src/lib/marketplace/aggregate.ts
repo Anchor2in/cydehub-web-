@@ -158,6 +158,45 @@ function parsePriceCents(text: string): number | null {
   return Math.round(amount * 100);
 }
 
+const TITLE_STOP_WORDS = new Set([
+  "ksh",
+  "kes",
+  "usd",
+  "eur",
+  "gbp",
+  "price",
+  "prices",
+  "current",
+  "original",
+  "was",
+  "is",
+  "under",
+  "above",
+  "from",
+  "to",
+  "all",
+  "in",
+  "one",
+  "compare",
+]);
+
+function hasMeaningfulTitle(title: string): boolean {
+  const normalized = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!normalized || normalized.length < 4) return false;
+
+  const tokens = normalized.split(" ");
+  const meaningfulTokens = tokens.filter(
+    (token) => token.length >= 3 && /[a-z]/.test(token) && !TITLE_STOP_WORDS.has(token),
+  );
+
+  return meaningfulTokens.length > 0;
+}
+
 function guessCategory(text: string): AggregatedMarketplaceCategory {
   const value = text.toLowerCase();
   if (value.includes("gift") && value.includes("card")) return "gift_card";
@@ -220,7 +259,7 @@ function parseProductJsonLd(html: string, baseUrl: string, source: string): Aggr
         if (!types.some((t) => typeof t === "string" && t.toLowerCase() === "product")) continue;
 
         const title = stripHtml(n.name ?? "");
-        if (!title) continue;
+        if (!title || !hasMeaningfulTitle(title)) continue;
 
         const description = stripHtml(n.description ?? "").slice(0, 280) || `${title} from ${source}.`;
         const sourceUrl = normalizeUrl(n.url ?? baseUrl, baseUrl);
@@ -273,7 +312,7 @@ function parseHtmlCards(html: string, baseUrl: string, source: string): Aggregat
 
     const title = cardText.split(" ").slice(0, 10).join(" ").trim();
     const cents = parsePriceCents(priceMatch[0]);
-    if (!title || !cents) continue;
+    if (!title || !cents || !hasMeaningfulTitle(title)) continue;
 
     const imgMatch = card.body.match(/<img[^>]+src=["']([^"']+)["']/i);
     const sourceUrl = normalizeUrl(card.href, baseUrl);
@@ -365,7 +404,7 @@ export async function getAggregatedMarketplaceItems(limit = 120): Promise<Aggreg
 
   const withFallbacks = ensureRequiredCategories([...merged.values()]);
   const items = withFallbacks
-    .filter((item) => item.title.length >= 4 && item.price_cents > 0)
+    .filter((item) => item.title.length >= 4 && item.price_cents > 0 && hasMeaningfulTitle(item.title))
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   cache = { at: Date.now(), items };
