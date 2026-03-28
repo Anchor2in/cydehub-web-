@@ -47,30 +47,44 @@ function formatKes(priceCents: number, currency: string): string {
   return `KSh ${new Intl.NumberFormat("en-KE").format(kes)}`;
 }
 
-function cleanExternalDescription(raw: string): string {
+function formatKesAmount(amount: number): string {
+  return `KSh ${new Intl.NumberFormat("en-KE").format(Math.round(amount))}`;
+}
+
+function extractCurrentKesAmount(raw: string): number | null {
   const trimmed = raw.replace(/\s+/g, " ").trim();
+
   const current = trimmed.match(/current price(?:\s+is)?\s*[:]?\s*(ksh|kes)?\s*([\d,]+(?:\.\d+)?)/i);
   if (current?.[2]) {
     const normalized = Number.parseFloat(current[2].replace(/,/g, ""));
-    if (Number.isFinite(normalized)) {
-      return `Current price: KSh ${new Intl.NumberFormat("en-KE").format(Math.round(normalized))}`;
-    }
+    if (Number.isFinite(normalized)) return Math.round(normalized);
   }
 
   const allKesValues = [...trimmed.matchAll(/(?:ksh|kes)\s*([\d,]+(?:\.\d+)?)/gi)];
   const finalKes = allKesValues.at(-1)?.[1];
-  if (finalKes) {
-    const normalized = Number.parseFloat(finalKes.replace(/,/g, ""));
-    if (Number.isFinite(normalized)) {
-      return `Current price: KSh ${new Intl.NumberFormat("en-KE").format(Math.round(normalized))}`;
-    }
-  }
+  if (!finalKes) return null;
 
-  return trimmed
+  const normalized = Number.parseFloat(finalKes.replace(/,/g, ""));
+  return Number.isFinite(normalized) ? Math.round(normalized) : null;
+}
+
+function formatExternalPrice(description: string, fallbackPriceCents: number, currency: string): string {
+  const current = extractCurrentKesAmount(description);
+  if (current !== null) return formatKesAmount(current);
+  return formatKes(fallbackPriceCents, currency);
+}
+
+function cleanExternalDescription(raw: string): string {
+  const trimmed = raw.replace(/\s+/g, " ").trim();
+  const cleaned = trimmed
     .replace(/original price was\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
-    .replace(/current price is\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
+    .replace(/current price(?:\s+is)?\s*[:]?\s*(ksh|kes)?\s*[\d,]+(?:\.\d+)?\.?/gi, "")
+    .replace(/(?:ksh|kes)\s*[\d,]+(?:\.\d+)?/gi, "")
     .replace(/\s+/g, " ")
+    .replace(/^[\s:;,.\-]+|[\s:;,.\-]+$/g, "")
     .trim();
+
+  return cleaned || "Marketplace offer";
 }
 
 function cleanExternalTitle(raw: string): string {
@@ -326,7 +340,7 @@ export default function MarketplacePage() {
                           {categoryLabel(item.category)}
                         </div>
                         <div className="pill-3d shrink-0 rounded-full px-3 py-1 text-xs font-medium text-white">
-                          {formatKes(item.price_cents, item.currency)}
+                          {formatExternalPrice(item.description, item.price_cents, item.currency)}
                         </div>
                       </div>
 
@@ -428,7 +442,7 @@ export default function MarketplacePage() {
                     </div>
                   </div>
                   <div className="pill-3d shrink-0 rounded-full px-3 py-1 text-sm font-medium text-white">
-                    {formatKes(item.price_cents, item.currency)}
+                    {formatExternalPrice(item.description, item.price_cents, item.currency)}
                   </div>
                 </div>
 
@@ -505,7 +519,7 @@ export default function MarketplacePage() {
                 </div>
               </div>
               <div className="pill-3d shrink-0 rounded-full px-3 py-1 text-sm font-medium text-white">
-                {formatKes(item.price_cents, item.currency)}
+                {formatExternalPrice(item.description, item.price_cents, item.currency)}
               </div>
             </div>
             <div className="mt-3 line-clamp-2 text-justify text-sm text-white/70">{cleanExternalDescription(item.description)}</div>
