@@ -17,8 +17,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "CydeHub",
+  metadataBase: new URL("https://cydehub.vercel.app/"),
   description:
-    "Digital products and services marketplace for gamers: games, subscriptions, coaching, tournaments, blogs, and chat.",
+    "Community hub for gamers with live chat, stories, and updates.",
 };
 
 export default function RootLayout({
@@ -29,7 +30,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} theme-dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
         <ToastProvider>

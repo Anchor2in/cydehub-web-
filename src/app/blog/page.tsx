@@ -5,7 +5,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { hasSupabaseEnv } from "@/lib/supabase/env";
 import type { AggregatedBlogPost, BlogPost } from "@/lib/models";
-import { demoStore } from "@/lib/demo/store";
 import { Skeleton } from "@/components/ui/Skeleton";
 
 export default function BlogPage() {
@@ -68,7 +67,7 @@ export default function BlogPage() {
         }
 
         if (!enabled) {
-          if (!cancelled) setPosts(demoStore.getPosts());
+          if (!cancelled) setError("Blog storage is not configured yet.");
           return;
         }
 
@@ -96,7 +95,7 @@ export default function BlogPage() {
   }, [enabled]);
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-10">
+    <div className="page-blog mx-auto w-full max-w-6xl px-4 py-10">
       <div className="flex items-end justify-between gap-6">
         <div>
           <h1 className="text-3xl font-semibold tracking-tight text-white">
@@ -106,12 +105,6 @@ export default function BlogPage() {
             News, views, and real-life lessons in gaming commerce.
           </p>
         </div>
-        <a
-          href="/marketplace"
-          className="text-sm font-medium text-[color:var(--cyber)] hover:underline"
-        >
-          Explore marketplace
-        </a>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">

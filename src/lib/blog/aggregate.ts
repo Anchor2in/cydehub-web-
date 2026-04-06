@@ -6,12 +6,12 @@ type FeedSource = {
 };
 
 const FEED_SOURCES: FeedSource[] = [
-  { name: "Kotaku", url: "https://kotaku.com/rss" },
-  { name: "Razer", url: "https://www.razer.com/blog/feed/" },
-  { name: "PlayStation Blog", url: "https://blog.playstation.com/feed/" },
   { name: "Xbox Wire", url: "https://news.xbox.com/en-us/feed/" },
-  { name: "IGN", url: "https://www.ign.com/rss" },
-  { name: "PC Gamer", url: "https://www.pcgamer.com/rss/" },
+  { name: "PlayStation Blog", url: "https://blog.playstation.com/feed/" },
+  { name: "Microsoft Blogs", url: "https://blogs.microsoft.com/feed/" },
+  { name: "EA News", url: "https://www.ea.com/news/rss" },
+  { name: "NVIDIA Blog", url: "https://blogs.nvidia.com/feed/" },
+  { name: "Unreal Engine", url: "https://www.unrealengine.com/en-US/feed/blog" },
 ];
 
 const CACHE_WINDOW_MS = 1000 * 60 * 10;
@@ -53,6 +53,32 @@ function readTag(xmlChunk: string, tags: string[]): string {
   return "";
 }
 
+function readLink(xmlChunk: string): string {
+  const hrefMatch = xmlChunk.match(/<link\b[^>]*\bhref=["']([^"']+)["'][^>]*\/?>/i);
+  if (hrefMatch?.[1]) {
+    return hrefMatch[1].trim();
+  }
+
+  return readTag(xmlChunk, ["link"]);
+}
+
+function readMediaUrl(xmlChunk: string): string | null {
+  const mediaTagMatch = xmlChunk.match(/<(media:content|media:thumbnail)\b[^>]*>/i)?.[0] ?? "";
+  const mediaUrl = mediaTagMatch.match(/\burl=["']([^"']+)["']/i)?.[1];
+  if (mediaUrl) {
+    return mediaUrl;
+  }
+
+  const enclosureTag = xmlChunk.match(/<enclosure\b[^>]*>/i)?.[0] ?? "";
+  const enclosureType = enclosureTag.match(/\btype=["']([^"']+)["']/i)?.[1] ?? "";
+  const enclosureUrl = enclosureTag.match(/\burl=["']([^"']+)["']/i)?.[1];
+  if (enclosureUrl && enclosureType.toLowerCase().startsWith("image/")) {
+    return enclosureUrl;
+  }
+
+  return null;
+}
+
 function slugify(value: string): string {
   return value
     .toLowerCase()
@@ -71,30 +97,29 @@ function stableId(value: string): string {
 }
 
 function parseFeedXml(xml: string, source: FeedSource): AggregatedBlogPost[] {
-  const itemMatches = [...xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)].map((m) => m[0]);
+  const chunks = [
+    ...[...xml.matchAll(/<item\b[\s\S]*?<\/item>/gi)].map((m) => m[0]),
+    ...[...xml.matchAll(/<entry\b[\s\S]*?<\/entry>/gi)].map((m) => m[0]),
+  ];
 
-  return itemMatches
-    .map((item) => {
-      const titleRaw = readTag(item, ["title"]);
-      const linkRaw = readTag(item, ["link"]);
-      const contentRaw = readTag(item, ["content:encoded", "description"]);
-      const excerptRaw = readTag(item, ["description", "content:encoded"]);
-      const pubDateRaw = readTag(item, ["pubDate", "published", "dc:date"]);
-      const mediaRaw = readTag(item, ["media:content", "media:thumbnail"]);
+  return chunks
+    .map((chunk) => {
+      const titleRaw = readTag(chunk, ["title"]);
+      const linkRaw = readLink(chunk);
+      const contentRaw = readTag(chunk, ["content:encoded", "content", "description", "summary"]);
+      const excerptRaw = readTag(chunk, ["summary", "description", "content:encoded", "content"]);
+      const pubDateRaw = readTag(chunk, ["pubDate", "published", "updated", "dc:date"]);
 
       const title = stripHtml(titleRaw);
       const sourceUrl = stripHtml(linkRaw);
       const story = stripHtml(contentRaw);
       const excerpt = stripHtml(excerptRaw).slice(0, 220);
       const published = new Date(stripHtml(pubDateRaw));
+      const imageUrl = readMediaUrl(chunk);
 
-      let imageUrl: string | null = null;
-      const urlMatch = mediaRaw.match(/url=["']([^"']+)["']/i);
-      if (urlMatch?.[1]) {
-        imageUrl = urlMatch[1];
-      }
+      if (!title || !sourceUrl || (!story && !excerpt)) return null;
 
-      if (!title || !sourceUrl || !story) return null;
+      const finalStory = story || excerpt;
 
       const slugBase = slugify(title) || "post";
       const slug = `${slugBase}-${stableId(sourceUrl)}`;
@@ -103,8 +128,8 @@ function parseFeedXml(xml: string, source: FeedSource): AggregatedBlogPost[] {
         id: `ext_${stableId(sourceUrl)}`,
         slug,
         title,
-        excerpt,
-        story,
+        excerpt: excerpt || finalStory.slice(0, 220),
+        story: finalStory,
         source: source.name,
         source_url: sourceUrl,
         image_url: imageUrl,

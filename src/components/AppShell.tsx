@@ -3,9 +3,6 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { DemoModeBanner } from "@/components/DemoModeBanner";
-import { hasSupabaseEnv } from "@/lib/supabase/env";
-import { ButtonLink } from "@/components/ui/Button";
 
 function IconMenu({ className }: { className?: string }) {
   return (
@@ -53,68 +50,108 @@ export function AppShell({
   children: React.ReactNode;
 }>) {
   const pathname = usePathname();
-  const demoMode = useMemo(() => !hasSupabaseEnv(), []);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const showGridOverlay = !pathname?.startsWith("/marketplace");
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const links = useMemo(
     () => [
-      { href: "/marketplace", label: "Marketplace" },
-      { href: "/tournaments", label: "Tournaments" },
       { href: "/blog", label: "Blog" },
+      { href: "/socials", label: "Socials" },
       { href: "/chat", label: "Chat" },
+      { href: "/account", label: "Account" },
+    ],
+    [],
+  );
+
+  const menuLinks = useMemo(
+    () => [
+      { href: "/", label: "Home" },
+      { href: "/blog", label: "Blog" },
+      { href: "/socials", label: "Socials" },
+      { href: "/chat", label: "Chat" },
+      { href: "/account", label: "Account" },
     ],
     [],
   );
 
   useEffect(() => {
-    setMobileOpen(false);
+    queueMicrotask(() => {
+      setMobileOpen(false);
+      setMenuOpen(false);
+    });
   }, [pathname]);
 
   const isActive = (href: string) =>
     pathname === href || (href !== "/" && pathname?.startsWith(href));
 
   return (
-    <div className={`min-h-full flex flex-col cyber-bg ${showGridOverlay ? "grid-overlay" : ""}`}>
-      {demoMode ? <DemoModeBanner /> : null}
+    <div className="min-h-full flex flex-col cyber-bg grid-overlay">
       <header className="sticky top-0 z-20 border-b border-white/10 bg-black/30 backdrop-blur-xl">
         <div className="mx-auto w-full max-w-6xl px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="font-semibold tracking-tight text-white text-xl md:text-2xl">
-            <span className="text-white">Cyde</span>
-            <span className="text-[color:var(--cyber)]">Hub</span>
-          </Link>
-          <nav className="hidden md:flex items-center gap-2 text-sm">
-            {links.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className={
-                  isActive(l.href)
-                    ? "rounded-full px-3 py-2 text-white bg-white/10 border border-white/10 backdrop-blur-xl shadow-cyber-soft"
-                    : "rounded-full px-3 py-2 text-white/80 border border-white/10 bg-white/5 backdrop-blur-xl shadow-cyber-soft hover:text-white hover:bg-white/10"
-                }
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <button
+                type="button"
+                className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/85 hover:bg-white/10"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label={menuOpen ? "Close site menu" : "Open site menu"}
+                aria-expanded={menuOpen}
               >
-                {l.label}
-              </Link>
-            ))}
-            <ButtonLink
-              href="/sell/new"
-              variant="primary"
-              size="sm"
-              className="animated-sheen neon-pulse text-white"
-            >
-              Sell
-            </ButtonLink>
-          </nav>
+                Menu
+                <span className="text-xs">▾</span>
+              </button>
 
-          <button
-            type="button"
-            className="md:hidden inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white/80 transition-all duration-150 hover:bg-white/10 active:scale-[0.98]"
-            onClick={() => setMobileOpen((v) => !v)}
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
-          >
-            {mobileOpen ? <IconX /> : <IconMenu />}
-          </button>
+              {menuOpen ? (
+                <div className="absolute left-0 top-full z-30 mt-2 w-56 rounded-2xl border border-white/10 bg-black/85 p-2 shadow-cyber-soft backdrop-blur-xl">
+                  {menuLinks.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMenuOpen(false)}
+                      className={
+                        isActive(item.href)
+                          ? "block rounded-xl px-3 py-2 text-sm text-white bg-white/10"
+                          : "block rounded-xl px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white"
+                      }
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+
+            <Link href="/" className="font-semibold tracking-tight text-white text-xl md:text-2xl">
+              <span className="text-white">Cyde</span>
+              <span className="text-[color:var(--cyber)]">Hub</span>
+            </Link>
+          </div>
+          <div className="flex items-center gap-3">
+            <nav className="hidden md:flex items-center gap-2 text-sm">
+              {links.map((l) => (
+                <Link
+                  key={l.href}
+                  href={l.href}
+                  className={
+                    isActive(l.href)
+                      ? "rounded-full px-3 py-2 text-white bg-white/10 border border-white/10 backdrop-blur-xl shadow-cyber-soft"
+                      : "rounded-full px-3 py-2 text-white/80 border border-white/10 bg-white/5 backdrop-blur-xl shadow-cyber-soft hover:text-white hover:bg-white/10"
+                  }
+                >
+                  {l.label}
+                </Link>
+              ))}
+            </nav>
+
+            <button
+              type="button"
+              className="md:hidden inline-flex items-center justify-center rounded-full border border-white/10 bg-white/5 px-3 py-2 text-white/80 transition-all duration-150 hover:bg-white/10 active:scale-[0.98]"
+              onClick={() => setMobileOpen((v) => !v)}
+              aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            >
+              {mobileOpen ? <IconX /> : <IconMenu />}
+            </button>
+          </div>
         </div>
 
         {mobileOpen ? (
@@ -133,14 +170,6 @@ export function AppShell({
                   {l.label}
                 </Link>
               ))}
-              <ButtonLink
-                href="/sell/new"
-                variant="primary"
-                size="md"
-                className="animated-sheen neon-pulse text-white"
-              >
-                Sell
-              </ButtonLink>
             </div>
           </div>
         ) : null}
@@ -155,7 +184,7 @@ export function AppShell({
                 <span className="text-[color:var(--cyber)]">Hub</span>
               </div>
               <div className="mt-2 text-sm text-white/60">
-                Digital products, services, coaching, tournaments, blogs, and chat.
+                Community chat, stories, and updates for players.
               </div>
               <div className="mt-4 text-xs text-white/50">Big ideas. Fast shipping.</div>
             </div>
@@ -166,11 +195,8 @@ export function AppShell({
                 <Link className="text-white/70 hover:text-white" href="/">
                   Home
                 </Link>
-                <Link className="text-white/70 hover:text-white" href="/marketplace">
-                  Marketplace
-                </Link>
-                <Link className="text-white/70 hover:text-white" href="/sell/new">
-                  Sell
+                <Link className="text-white/70 hover:text-white" href="/blog">
+                  Blog
                 </Link>
                 <Link className="text-white/70 hover:text-white" href="/account">
                   Account
@@ -184,9 +210,6 @@ export function AppShell({
                 <Link className="text-white/70 hover:text-white" href="/chat">
                   Chat
                 </Link>
-                <Link className="text-white/70 hover:text-white" href="/tournaments">
-                  Tournaments
-                </Link>
                 <Link className="text-white/70 hover:text-white" href="/blog">
                   Blog
                 </Link>
@@ -197,11 +220,9 @@ export function AppShell({
               <div className="text-sm font-semibold text-white">Status</div>
               <div className="mt-3 flex flex-col gap-2 text-sm text-white/70">
                 <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3">
-                  {demoMode ? "Demo Mode enabled" : "Supabase connected"}
+                  Authentication ready
                 </div>
-                <div className="text-xs text-white/50">
-                  Connect Supabase later for real auth + realtime.
-                </div>
+                <div className="text-xs text-white/50">Sign in to access account and chat features.</div>
               </div>
             </div>
           </div>

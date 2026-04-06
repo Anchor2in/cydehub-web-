@@ -2,6 +2,7 @@ create extension if not exists "uuid-ossp";
 
 create table if not exists public.profiles (
   id uuid primary key references auth.users(id) on delete cascade,
+  username text unique,
   display_name text,
   avatar_url text,
   created_at timestamptz not null default now()
@@ -110,8 +111,17 @@ create table if not exists public.chat_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.chat_telegram_topics (
+  room_id uuid primary key references public.chat_rooms(id) on delete cascade,
+  thread_id bigint not null unique,
+  topic_name text,
+  created_by uuid not null references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
 alter table public.chat_rooms enable row level security;
 alter table public.chat_messages enable row level security;
+alter table public.chat_telegram_topics enable row level security;
 
 create policy "chat_rooms_select" on public.chat_rooms
 for select
@@ -132,3 +142,13 @@ create policy "chat_messages_insert" on public.chat_messages
 for insert
 to authenticated
 with check (auth.uid() = sender_id);
+
+create policy "chat_telegram_topics_select" on public.chat_telegram_topics
+for select
+to authenticated
+using (true);
+
+create policy "chat_telegram_topics_insert" on public.chat_telegram_topics
+for insert
+to authenticated
+with check (auth.uid() = created_by);
